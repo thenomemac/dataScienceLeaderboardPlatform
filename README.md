@@ -10,16 +10,16 @@ The app also provides the functionaly to have serveral web pages for your predic
 * Prizes
 * Timeline
 * Discussion 
-..* Implemented via link: twitter, reddit, sharepoint, ext
+    * Implemented via link: twitter, reddit, sharepoint, ext
 * Leader Board
-..* Implemented in javascript
-..* Shows most recent submission by user
+    * Implemented in javascript
+    * Shows most recent submission by user
 
 
 Steps to running the app:
 
 1. Check *./config.py* and make sure the ENVIRONMENT variables make sense.
-..* Note that many files feature '#! flask/bin/python' so you can run them with a python virtualenv in the project directory or you can use you current python distribution.
+    * Note that many files feature '#! flask/bin/python' so you can run them with a python virtualenv in the project directory or you can use you current python distribution.
 
 2. To launch the app run with your default python distribution: 'python run.py'
 
