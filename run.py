@@ -1,3 +1,3 @@
 #! flask/bin/python
-from app import app
+from leaderBoardApp import app
 app.run(debug=True)

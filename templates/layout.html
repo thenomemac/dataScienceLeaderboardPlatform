@@ -1,0 +1,34 @@
+<!doctype html>
+<title>{% block title %}Welcome{% endblock %} | {{ g.globalTitle }}</title>
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+<div class=page>
+  <h1>{{ g.globalTitle }}</h1>
+  <div class=navigation>
+  {% if g.user %}
+    {% for page in g.usedPages %}
+      <a href="{{ url_for(page) }}">{{ page }}</a> |
+    {% endfor %}
+    <a href="{{ url_for('logout') }}">sign out [{{ g.user.username }}]</a>
+  {% else %}
+    {% for page in g.usedPages %}
+      <a href="{{ url_for(page) }}">{{ page }}</a> |
+    {% endfor %}
+    <a href="{{ url_for('login') }}">sign in</a>
+  {% endif %}
+  </div>
+  {% with flashes = get_flashed_messages() %}
+    {% if flashes %}
+      <ul class=flashes>
+      {% for message in flashes %}
+        <li>{{ message }}
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  <div class=body>
+  {% block body %}{% endblock %}
+  </div>
+  <div class=footer>
+    dataScienceLeaderBoardApp &mdash; A Flask Application
+  </div>
+</div>
