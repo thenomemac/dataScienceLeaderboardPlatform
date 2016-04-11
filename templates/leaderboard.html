@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+  <h2>Leaderboard</h2>
+  {% for entry in leaderboard %}
+  <p>{{ entry.user_id }} :     {{ entry.public_score }}</p>
+  {% endfor %}
+{% endblock %}
+

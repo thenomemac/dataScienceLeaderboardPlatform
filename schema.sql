@@ -6,16 +6,13 @@ create table user (
   pw_hash text not null
 );
 
-drop table if exists follower;
-create table follower (
-  who_id integer,
-  whom_id integer
-);
-
-drop table if exists message;
-create table message (
-  message_id integer primary key autoincrement,
-  author_id integer not null,
-  text text not null,
-  pub_date integer
+drop table if exists submission;
+create table submission (
+  submission_id integer primary key autoincrement,
+  user_id integer not null,
+  filename text not null,
+  submit_date integer not null,
+  public_score real not null,
+  private_score real not null,
+  total_score real not null
 );

@@ -89,3 +89,6 @@ ENV/
 
 # SQLite
 *.db
+
+# Submission cache directory
+contest/submissions

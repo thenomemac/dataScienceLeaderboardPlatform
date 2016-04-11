@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+  {% if g.user %}
+    By uploading a submission file you are agreeing to the contest 
+    <a href="{{ url_for('rules') }}">rules</a>. Make a submission:
+    <div class=uploadform>
+      <h3>Upload</h3>
+      <form action="" method=post enctype=multipart/form-data>
+        <p><input type=file name=file>
+           <input type=submit value=Upload>
+      </form>
+    </div>
+  {% else %}
+    Must be logged in to make a submission.
+  {% endif %}
+{% endblock %}
+

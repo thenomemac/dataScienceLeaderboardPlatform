@@ -8,7 +8,6 @@ The app also provides the functionaly to have serveral web pages for your predic
 * Evaluation
 * Rules
 * Prizes
-* Timeline
 * Discussion 
   * Implemented via link: twitter, reddit, sharepoint, ext
 * Leader Board
@@ -19,6 +18,10 @@ The app also provides the functionaly to have serveral web pages for your predic
 Steps to running the app:
 
 1. Edit the configuration in the `leaderBoardApp.py` file or export an `LEADERBOARDAPP_SETTINGS` environment variable pointing to a configuration file.
-2. To launch the app run with your default python distribution: `python run.py`
+2. Edit the modeling contest specific settings in `leaderBoardApp.py`
+3. Edit the markdown files documenting the contest rules and more in `contest/content`
+4. Edit the function used to score and load user submitted data with the loss function for the contest in `contest/helperfxns/__init__.py`
+5. To launch the app run with your default python distribution: `python leaderBoardApp.py`
 
 Is the app tested? No unit tests still need to be written.
+App was buit on flask 0.1x

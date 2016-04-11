@@ -9,26 +9,33 @@
     :license: MIT, see LICENSE for more details.
 """
 
+import os
 import time
+from contest.helperfxns import loadAndScore
 from sqlite3 import dbapi2 as sqlite3
 from hashlib import md5
 from datetime import datetime
-from flask import Flask, request, session, url_for, redirect, \
+from flask import Flask, Markup, request, session, url_for, redirect, \
      render_template, abort, g, flash, _app_ctx_stack
-from werkzeug import check_password_hash, generate_password_hash
+from markdown import markdown
+from werkzeug import check_password_hash, generate_password_hash, \
+     secure_filename
 
 
 # configuration
 DATABASE = 'dsLeaderboard.db'
-PER_PAGE = 30
 DEBUG = True
-SECRET_KEY = 'development key'
+SECRET_KEY = 'superSecretKeyGoesHere'
 
 # contest specific variables
 globalTitle = 'Data Modeling Contest App'
-usedPages = ['description'] 
-#'evaluation', 'rules', 'prizes', 'timeline'
-#             'discussion', 'leaderboard']
+usedPages = ['description', 'evaluation', 'rules', 'prizes', 'discussion']
+externalDiscussionLink = 'https://www.reddit.com/r/MachineLearning/'
+# consider changing this, uploads can take a lot of drive space
+UPLOAD_FOLDER = 'contest/submissions/'
+ALLOWED_EXTENSIONS = ['csv', 'txt', 'zip', 'gz']
+# order the score function by asc or desc
+orderBy = 'asc'
 
 # create app
 app = Flask(__name__)
@@ -100,26 +107,120 @@ def before_request():
 
 
 @app.route('/')
-def timeline():
-    """Shows a users timeline or if no user is logged in it will
-    redirect to the public timeline.  This timeline shows the user's
-    messages as well as all the messages of followed users.
+def defaultlanding():
+    """Shows a users leaderboard for modeling contest.
+    If not logged in then forward user to contest description.
     """
+    #send user to description page if not logged in
     if not g.user:
         return redirect(url_for('description'))
-    return render_template('leaderboard.html', messages=query_db('''
-        select message.*, user.* from message, user
-        where message.author_id = user.user_id and (
-            user.user_id = ? or
-            user.user_id in (select whom_id from follower
-                                    where who_id = ?))
-        order by message.pub_date desc limit ?''',
-        [session['user_id'], session['user_id'], PER_PAGE]))
+    #display leaderboard for competition if logged in
+    return redirect(url_for('leaderboard'))
+
+@app.route('/leaderboard')
+def leaderboard():
+    board = query_db('''
+        select sub.* from submission sub
+        inner join (select user_id, max(submit_date) max_submit_date 
+          from submission group by user_id) max_sub
+        on sub.user_id = max_sub.user_id and
+          sub.submit_date = max_sub.max_submit_date 
+        order by sub.submit_date %s''' % orderBy)
+    return render_template('leaderboard.html',
+                           title='Leaderboard',
+                           leaderboard=board)
 
 @app.route('/description')
 def description():
-    """Shows a user a description of the contest"""
-    return render_template('description.html')
+    """Displays a markdown doc describing the predictive modeling contest.
+    Note ./content/contest/<url calling path>.md must be modified for contest.
+    """
+    #rule = request.url_rule
+    #print(rule)
+    file = open('./contest/content/description.md', 'r')
+    rawText = file.read()
+    file.close()
+    content = Markup(markdown(rawText))
+    return render_template('markdowntemplate.html', 
+                           title='Description', 
+                           content=content)
+
+@app.route('/evaluation')
+def evaluation():
+    """Displays a markdown doc describing the predictive modeling contest.
+    Note ./content/contest/<url calling path>.md must be modified for contest.
+    """
+    file = open('./contest/content/evaluation.md', 'r')
+    rawText = file.read()
+    file.close()
+    content = Markup(markdown(rawText))
+    return render_template('markdowntemplate.html', 
+                           title='Evaluation', 
+                           content=content)
+                           
+@app.route('/rules')
+def rules():
+    """Displays a markdown doc describing the predictive modeling contest.
+    Note ./content/contest/<url calling path>.md must be modified for contest.
+    """
+    file = open('./contest/content/rules.md', 'r')
+    rawText = file.read()
+    file.close()
+    content = Markup(markdown(rawText))
+    return render_template('markdowntemplate.html', 
+                           title='Rules', 
+                           content=content)
+     
+@app.route('/prizes')
+def prizes():
+    """Displays a markdown doc describing the predictive modeling contest.
+    Note ./content/contest/<url calling path>.md must be modified for contest.
+    """
+    file = open('./contest/content/prizes.md', 'r')
+    rawText = file.read()
+    file.close()
+    content = Markup(markdown(rawText))
+    return render_template('markdowntemplate.html', 
+                           title='Prizes', 
+                           content=content)
+
+@app.route('/discussion')
+def discussion():
+    return redirect(externalDiscussionLink)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+@app.route('/uploadsubmission', methods=['GET', 'POST'])
+def upload_file():
+    """Allow users to upload submissions to modeling contest
+    Users must be logged in."""
+    if request.method == 'POST':
+        try:
+            file = request.files['file']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                #append userid and date to file to avoid duplicates
+                filename = str(session['user_id']) + '_' + \
+                           str(int(time.time())) + '_' + filename
+                fullPath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(fullPath)
+                model_score = loadAndScore(fullPath)
+                #cache the filename and submission to database
+                db = get_db()
+                db.execute('''insert into submission (user_id, filename, submit_date,     
+                           public_score, private_score, total_score) 
+                           values (?, ?, ?, ?, ?, ?)''',                  
+                           (session['user_id'], filename, int(time.time()), *model_score))
+                db.commit()
+                flash('Your submission was recorded.')
+                return redirect(url_for('leaderboard'))
+        except:
+            flash('File did not upload or score correctly!')
+    return render_template('uploadsubmission.html', 
+                           title="Upload Submission")
+
 
 @app.route('/public')
 def public_timeline():
@@ -183,6 +284,8 @@ def unfollow_user(username):
     return redirect(url_for('user_timeline', username=username))
 
 
+
+
 @app.route('/add_message', methods=['POST'])
 def add_message():
     """Registers a new message for the user."""
@@ -202,7 +305,7 @@ def add_message():
 def login():
     """Logs the user in."""
     if g.user:
-        return redirect(url_for('timeline'))
+        return redirect(url_for('leaderboard'))
     error = None
     if request.method == 'POST':
         user = query_db('''select * from user where
@@ -215,7 +318,7 @@ def login():
         else:
             flash('You were logged in')
             session['user_id'] = user['user_id']
-            return redirect(url_for('timeline'))
+            return redirect(url_for('leaderboard'))
     return render_template('login.html', error=error)
 
 
@@ -254,7 +357,7 @@ def logout():
     """Logs the user out."""
     flash('You were logged out')
     session.pop('user_id', None)
-    return redirect(url_for('public_timeline'))
+    return redirect(url_for('leaderboard'))
 
 
 # add some filters to jinja

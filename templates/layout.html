@@ -4,16 +4,17 @@
 <div class=page>
   <h1>{{ g.globalTitle }}</h1>
   <div class=navigation>
+  {% for page in g.usedPages %}
+    <a href="{{ url_for(page) }}">{{ page }}</a> |
+  {% endfor %}
   {% if g.user %}
-    {% for page in g.usedPages %}
-      <a href="{{ url_for(page) }}">{{ page }}</a> |
-    {% endfor %}
+    <a href="uploadsubmission">upload submission</a> |
+    <a href="{{ url_for('leaderboard') }}">leaderboard</a> |  
     <a href="{{ url_for('logout') }}">sign out [{{ g.user.username }}]</a>
   {% else %}
-    {% for page in g.usedPages %}
-      <a href="{{ url_for(page) }}">{{ page }}</a> |
-    {% endfor %}
-    <a href="{{ url_for('login') }}">sign in</a>
+    <a href="{{ url_for('leaderboard') }}">leaderboard</a> |  
+    <a href="{{ url_for('register') }}">register</a> |
+    <a href="{{ url_for('login') }}">sign in</a> 
   {% endif %}
   </div>
   {% with flashes = get_flashed_messages() %}
