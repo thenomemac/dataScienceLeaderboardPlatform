@@ -2,8 +2,24 @@
 {% block title %}{{ title }}{% endblock %}
 {% block body %}
   <h2>Leaderboard</h2>
-  {% for entry in leaderboard %}
-  <p>{{ entry.user_id }} :     {{ entry.public_score }}</p>
-  {% endfor %}
+
+  <table class="table table-nonfluid">
+    <thead class="thead-inverse">
+      <tr>
+      {% for colName in colNames %}
+        <th>{{ colName }}</th>
+      {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for entry in leaderboard %}
+    <tr>
+      <th scope="row">{{ entry.rank }}</th>
+      <td>{{ entry.username }}</td>
+      <td>{{ entry.score }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 {% endblock %}
 

@@ -1,35 +1,76 @@
-<!doctype html>
-<title>{% block title %}Welcome{% endblock %} | {{ g.globalTitle }}</title>
-<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
-<div class=page>
-  <h1>{{ g.globalTitle }}</h1>
-  <div class=navigation>
-  {% for page in g.usedPages %}
-    <a href="{{ url_for(page) }}">{{ page }}</a> |
-  {% endfor %}
-  {% if g.user %}
-    <a href="uploadsubmission">upload submission</a> |
-    <a href="{{ url_for('leaderboard') }}">leaderboard</a> |  
-    <a href="{{ url_for('logout') }}">sign out [{{ g.user.username }}]</a>
-  {% else %}
-    <a href="{{ url_for('leaderboard') }}">leaderboard</a> |  
-    <a href="{{ url_for('register') }}">register</a> |
-    <a href="{{ url_for('login') }}">sign in</a> 
-  {% endif %}
-  </div>
-  {% with flashes = get_flashed_messages() %}
-    {% if flashes %}
-      <ul class=flashes>
-      {% for message in flashes %}
-        <li>{{ message }}
-      {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-  <div class=body>
-  {% block body %}{% endblock %}
-  </div>
-  <div class=footer>
-    dataScienceLeaderBoardApp &mdash; A Flask Application
-  </div>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Welcome{% endblock %} | {{ g.globalTitle }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Bootstrap -->
+    <link href="static/bootstrap/css/bootstrap.css" rel="stylesheet">
+    <style>
+      body {
+        padding-top: 60px; 
+      }
+    </style>
+    <link href="static/bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+     <style>
+      .table-nonfluid {
+         width: auto;
+      }
+    </style>
+  </head>
+  
+  <body>
+    
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="brand" href="/">{{ g.globalTitle }}</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <!-- <li class="active"><a href="#"></a></li> -->
+            {% for page in g.usedPages %}
+              <li><a href="{{ url_for(page) }}">{{ page }}</a></li>
+            {% endfor %}
+            {% if g.user %}
+              <li><a href="uploadsubmission">upload submission</a></li>
+              <li><a href="{{ url_for('leaderboard') }}">leaderboard</a></li>
+              <li><a href="{{ url_for('logout') }}">sign out [{{ g.user.username }}]</a></li>
+            {% else %}
+              <!--<li class="active"><a href="#"></a></li>-->
+              <li><a href="{{ url_for('leaderboard') }}">leaderboard</a></li>
+              <li><a href="{{ url_for('register') }}">register</a></li>
+              <li><a href="{{ url_for('login') }}">sign in</a></li>      
+            {% endif %}
+            </ul>
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    {% include 'flash.html' %}
+
+    <div class="container">
+      {% block body %}{% endblock %}
+      
+      <hr>
+      <footer>
+        <p>Data Science Leaderboard App &mdash; A Flask Application</p>
+      </footer>
+    </div>
+    
+    <script src="static/jquery/jquery.js"></script>
+    <script src="static/bootstrap/js/bootstrap.min.js"></script>
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+    </script>
+    <script type="text/javascript" async src="static/mathjax/MathJax.js?config=TeX-AMS_CHTML"></script>
+    
+  </body>
+</html>  

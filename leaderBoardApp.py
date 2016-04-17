@@ -16,7 +16,7 @@ from sqlite3 import dbapi2 as sqlite3
 from hashlib import md5
 from datetime import datetime
 from flask import Flask, Markup, request, session, url_for, redirect, \
-     render_template, abort, g, flash, _app_ctx_stack
+     render_template, abort, g, flash, send_from_directory, _app_ctx_stack
 from markdown import markdown
 from werkzeug import check_password_hash, generate_password_hash, \
      secure_filename
@@ -28,14 +28,16 @@ DEBUG = True
 SECRET_KEY = 'superSecretKeyGoesHere'
 
 # contest specific variables
-globalTitle = 'Data Modeling Contest App'
-usedPages = ['description', 'evaluation', 'rules', 'prizes', 'discussion']
+globalTitle = 'Modeling Contest'
+usedPages = ['description', 'evaluation', 'rules', 'data', 'discussion']
+# discussion navbar link will link to this forum-wiki-like resource
 externalDiscussionLink = 'https://www.reddit.com/r/MachineLearning/'
 # consider changing this, uploads can take a lot of drive space
 UPLOAD_FOLDER = 'contest/submissions/'
 ALLOWED_EXTENSIONS = ['csv', 'txt', 'zip', 'gz']
 # order the score function by asc or desc
 orderBy = 'asc'
+
 
 # create app
 app = Flask(__name__)
@@ -52,7 +54,6 @@ def get_db():
         top.sqlite_db = sqlite3.connect(app.config['DATABASE'])
         top.sqlite_db.row_factory = sqlite3.Row
     return top.sqlite_db
-
 
 @app.teardown_appcontext
 def close_database(exception):
@@ -90,12 +91,6 @@ def format_datetime(timestamp):
     return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d @ %H:%M')
 
 
-def gravatar_url(email, size=80):
-    """Return the gravatar image for the given email address."""
-    return 'http://www.gravatar.com/avatar/%s?d=identicon&s=%d' % \
-        (md5(email.strip().lower().encode('utf-8')).hexdigest(), size)
-
-
 @app.before_request
 def before_request():
     g.usedPages = usedPages
@@ -117,18 +112,34 @@ def defaultlanding():
     #display leaderboard for competition if logged in
     return redirect(url_for('leaderboard'))
 
+
 @app.route('/leaderboard')
 def leaderboard():
+    #query the db and render the table used to display the leaderboard to users    
     board = query_db('''
-        select sub.* from submission sub
+        select username, public_score, private_score 
+        from submission sub
         inner join (select user_id, max(submit_date) max_submit_date 
           from submission group by user_id) max_sub
         on sub.user_id = max_sub.user_id and
           sub.submit_date = max_sub.max_submit_date 
-        order by sub.submit_date %s''' % orderBy)
+        inner join user
+        on sub.user_id = user.user_id
+        order by public_score %s''' % orderBy)
+    
+    #Debug: board = [{'public_score': 0.3276235370053617, 'username': 'test3', 'private_score': 0.32036252335937015}, {'public_score': 0.3276235370053617, 'username': 'test1', 'private_score': 0.32036252335937015}, {'public_score': 0.33944709256230005, 'username': 'test2', 'private_score': 0.32003513414185064}]
+    board = [dict(row) for row in board]
+    for rank, row in enumerate(board):
+        row['rank'] = rank + 1
+        row['score'] = row['public_score']
+    
+    colNames = ['Rank', 'Participant', 'Holdout Score']
+    
     return render_template('leaderboard.html',
                            title='Leaderboard',
+                           colNames=colNames,
                            leaderboard=board)
+
 
 @app.route('/description')
 def description():
@@ -140,10 +151,12 @@ def description():
     file = open('./contest/content/description.md', 'r')
     rawText = file.read()
     file.close()
-    content = Markup(markdown(rawText))
+    content = Markup(markdown(rawText, 
+        extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']))
     return render_template('markdowntemplate.html', 
                            title='Description', 
                            content=content)
+
 
 @app.route('/evaluation')
 def evaluation():
@@ -153,11 +166,13 @@ def evaluation():
     file = open('./contest/content/evaluation.md', 'r')
     rawText = file.read()
     file.close()
-    content = Markup(markdown(rawText))
+    content = Markup(markdown(rawText, 
+        extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']))
     return render_template('markdowntemplate.html', 
                            title='Evaluation', 
                            content=content)
                            
+
 @app.route('/rules')
 def rules():
     """Displays a markdown doc describing the predictive modeling contest.
@@ -166,11 +181,35 @@ def rules():
     file = open('./contest/content/rules.md', 'r')
     rawText = file.read()
     file.close()
-    content = Markup(markdown(rawText))
+    content = Markup(markdown(rawText, 
+        extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']))
     return render_template('markdowntemplate.html', 
                            title='Rules', 
                            content=content)
      
+     
+@app.route('/contest/download/<path:path>')
+def send_dir(path):
+    # this function is used to serve the train/test files linked to in data.md
+    return send_from_directory('contest/download', path)
+    
+
+@app.route('/data')
+def data():
+    """Displays a markdown doc describing the predictive modeling contest.
+    Note ./content/contest/<url calling path>.md must be modified for contest.
+    """
+    file = open('./contest/content/data.md', 'r')
+    rawText = file.read()
+    file.close()
+    content = Markup(markdown(rawText, 
+        extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']))
+    return render_template('markdowntemplate.html', 
+                           title='Data', 
+                           content=content)
+                           
+
+# in dev version of the app the prizes page isn't used due to overlap with description/rules                           
 @app.route('/prizes')
 def prizes():
     """Displays a markdown doc describing the predictive modeling contest.
@@ -179,18 +218,22 @@ def prizes():
     file = open('./contest/content/prizes.md', 'r')
     rawText = file.read()
     file.close()
-    content = Markup(markdown(rawText))
+    content = Markup(markdown(rawText, 
+        extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']))
     return render_template('markdowntemplate.html', 
                            title='Prizes', 
                            content=content)
+
 
 @app.route('/discussion')
 def discussion():
     return redirect(externalDiscussionLink)
 
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
 
 @app.route('/uploadsubmission', methods=['GET', 'POST'])
 def upload_file():
@@ -229,76 +272,6 @@ def public_timeline():
         select message.*, user.* from message, user
         where message.author_id = user.user_id
         order by message.pub_date desc limit ?''', [PER_PAGE]))
-
-
-@app.route('/<username>')
-def user_timeline(username):
-    """Display's a users tweets."""
-    profile_user = query_db('select * from user where username = ?',
-                            [username], one=True)
-    if profile_user is None:
-        abort(404)
-    followed = False
-    if g.user:
-        followed = query_db('''select 1 from follower where
-            follower.who_id = ? and follower.whom_id = ?''',
-            [session['user_id'], profile_user['user_id']],
-            one=True) is not None
-    return render_template('timeline.html', messages=query_db('''
-            select message.*, user.* from message, user where
-            user.user_id = message.author_id and user.user_id = ?
-            order by message.pub_date desc limit ?''',
-            [profile_user['user_id'], PER_PAGE]), followed=followed,
-            profile_user=profile_user)
-
-
-@app.route('/<username>/follow')
-def follow_user(username):
-    """Adds the current user as follower of the given user."""
-    if not g.user:
-        abort(401)
-    whom_id = get_user_id(username)
-    if whom_id is None:
-        abort(404)
-    db = get_db()
-    db.execute('insert into follower (who_id, whom_id) values (?, ?)',
-              [session['user_id'], whom_id])
-    db.commit()
-    flash('You are now following "%s"' % username)
-    return redirect(url_for('user_timeline', username=username))
-
-
-@app.route('/<username>/unfollow')
-def unfollow_user(username):
-    """Removes the current user as follower of the given user."""
-    if not g.user:
-        abort(401)
-    whom_id = get_user_id(username)
-    if whom_id is None:
-        abort(404)
-    db = get_db()
-    db.execute('delete from follower where who_id=? and whom_id=?',
-              [session['user_id'], whom_id])
-    db.commit()
-    flash('You are no longer following "%s"' % username)
-    return redirect(url_for('user_timeline', username=username))
-
-
-
-
-@app.route('/add_message', methods=['POST'])
-def add_message():
-    """Registers a new message for the user."""
-    if 'user_id' not in session:
-        abort(401)
-    if request.form['text']:
-        db = get_db()
-        db.execute('''insert into message (author_id, text, pub_date)
-          values (?, ?, ?)''', (session['user_id'], request.form['text'],
-                                int(time.time())))
-        db.commit()
-        flash('Your message was recorded')
-    return redirect(url_for('timeline'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -360,11 +333,13 @@ def logout():
     return redirect(url_for('leaderboard'))
 
 
-# add some filters to jinja
-app.jinja_env.filters['datetimeformat'] = format_datetime
-app.jinja_env.filters['gravatar'] = gravatar_url
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 
+#launch application for dev purposes when leaderBoardApp.py script is run
 if __name__ == '__main__':
-    init_db()
+    #only re-run init_db() on launch if you want to truncate you're sql tables
+    #init_db()
     app.run()
