@@ -22,7 +22,9 @@ Steps to running the app:
 3. Edit the markdown files documenting the contest rules and more in `contest/content`
 4. Edit the function used to score and load user submitted data with the loss function for the contest in `contest/helperfxns/__init__.py`
 5. Place any files used in scoring in `contest/data` and any files the user needs to download in `contest/download`
-6. To launch the app run with your default python distribution: `python leaderBoardApp.py`
+6. Run a `mkdir ./contest/submissions/` cmd to create the ignored folder where user uploads are cached.
+7. Uncomment out `init_db()` at the bottom of the `leaderBoardApp.py` if you need to create the sql database, ie running the app for the first time.
+8. To launch the app run with your default python distribution: `python leaderBoardApp.py`
 
 Note that the License is stated as MIT. This only pertains to app specific code. In the `static/` path copies of MathJax, jquery and bootstrap JS are included for making the app self contained. These dependencies have their own license agreements.
 
