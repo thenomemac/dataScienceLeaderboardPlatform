@@ -37,14 +37,16 @@ UPLOAD_FOLDER = 'contest/submissions/'
 ALLOWED_EXTENSIONS = ['csv', 'txt', 'zip', 'gz']
 # order the score function by asc or desc
 orderBy = 'asc'
-# set the max number of submissions a user is able to submit
+# set the max number of submissions a user is able to submit for final contest 
+# scoring against the private leaderboard, ie best of # selected submissions are considered
 subNbr = 1
 # max number of submissions a user is allowed to make in a rolling 24hr period
 dailyLimit = 2
 # set the contest deadline where users can no longer upload and private score is published
 contestDeadline = time.mktime(datetime(2016, 10, 21, 0, 0).timetuple())
-# debug variable that allows private leaderboard to be displayed before contest deadline
-showPublic = False
+# debug variable that if True allows private leaderboard to be displayed before contest deadline
+# normally should be False
+showPrivate = False
 
 # create app
 app = Flask(__name__)
@@ -104,6 +106,11 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 
+def contestEndBool():
+    #return boolean if contest is over to change 'post' methods behavior
+    return (contestDeadline - time.time()) < 0 or showPrivate
+
+
 @app.before_request
 def before_request():
     g.usedPages = usedPages
@@ -129,21 +136,7 @@ def defaultlanding():
 @app.route('/leaderboard')
 def leaderboard():
     #query the db and render the table used to display the leaderboard to users 
-    if (contestDeadline - time.time()) < 0 and showPublic:
-        board = query_db('''
-            select username, public_score, '?' private_score, sub_cnt
-            from submission sub
-            inner join (
-              select user_id, max(submit_date) max_submit_date, count(*) sub_cnt 
-              from submission 
-              group by user_id
-            ) max_sub
-            on sub.user_id = max_sub.user_id and
-              sub.submit_date = max_sub.max_submit_date 
-            inner join user
-            on sub.user_id = user.user_id
-            order by public_score %s''' % orderBy)
-    else:
+    if contestEndBool():
         #when evaluating for private score we take user selection table
         #or most recent submission if user didn't specify what submission was final
         board = query_db('''
@@ -176,6 +169,21 @@ def leaderboard():
             ) temp
             group by username
             order by private_score %s''' % orderBy)
+    else:
+        #display the public leader board when contest hasn't ended yet
+        board = query_db('''
+            select username, public_score, '?' private_score, sub_cnt
+            from submission sub
+            inner join (
+              select user_id, max(submit_date) max_submit_date, count(*) sub_cnt 
+              from submission 
+              group by user_id
+            ) max_sub
+            on sub.user_id = max_sub.user_id and
+              sub.submit_date = max_sub.max_submit_date 
+            inner join user
+            on sub.user_id = user.user_id
+            order by public_score %s''' % orderBy)
             
     #Debug: board = [{'public_score': 0.3276235370053617, 'username': 'test3', 'private_score': 0.32036252335937015}, {'public_score': 0.3276235370053617, 'username': 'test1', 'private_score': 0.32036252335937015}, {'public_score': 0.33944709256230005, 'username': 'test2', 'private_score': 0.32003513414185064}]
     board = [dict(row) for row in board]
@@ -289,6 +297,10 @@ def select_model():
     Default selection should be most recent submissions
     """
     try:
+        #check if contest has ended
+        if contestEndBool():
+            flash("Error: contest has ended")
+            raise Exception("contest has ended")
         input = request.form
         print(str(input))
         for count, x in enumerate(input): print(count, x)
@@ -333,16 +345,28 @@ def upload_file():
     
     if request.method == 'POST':
         try:
+            #check if contest has ended
+            if contestEndBool():
+                flash("Error: contest has ended")
+                raise Exception("contest has ended")
+            
+            print("here")
             #ensure user hasn't exceeded daily submission limit
             dailyCnt = query_db('''select count(*) sub_cnt
                 from submission sub
                 where submit_date > %s
-                group by user_id''' % (time.time() - 60*60*24))
-            dailyCnt = int(dict(dailyCnt[0])['sub_cnt'])
+                and user_id = %s
+                group by user_id''' % (time.time() - 60*60*24, session['user_id']))
+            
+            if len(dailyCnt) == 0:
+                dailyCnt = 0
+            else:
+                dailyCnt = int(dict(dailyCnt[0])['sub_cnt'])
+            
             if dailyCnt > dailyLimit:
                 flash("Error: exceeded daily upload limit")
                 raise Exception('Upload limit exceeded')
-
+            
             file = request.files['file']
             #throw error if extension is not allowed
             if not allowed_file(file.filename):
@@ -452,6 +476,7 @@ def page_not_found(e):
 
 #launch application for dev purposes when leaderBoardApp.py script is run
 if __name__ == '__main__':
-    #only re-run init_db() on launch if you want to truncate you're sql tables
-    #init_db()
+    #only re-run init_db() on initial launch if you want to truncate you're sql tables
+    if not os.path.isfile('dsLeaderboard.db'):
+        init_db()
     app.run()
