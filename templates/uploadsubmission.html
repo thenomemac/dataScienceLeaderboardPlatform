@@ -11,6 +11,16 @@
            <input type=submit value=Upload>
       </form>
     </div>
+    
+    <br>
+    <p><b>Select {{ subNbr }} submission(s) for final scoring:</b></p>
+    <form action="selectmodel" method=post>
+    {% for entry in userBoard %}
+      <p><input type="checkbox" name="{{ entry.submission_id }}"/> <u>{{ entry.str_time }}</u>: {{ entry.public_score }}</p>
+    {% endfor %}
+    <input type="submit" value="Submit">
+    </form>
+    <p>Note: if a manual selection is made, the user must revisit this dialog to set final submission.</p>
   {% else %}
     Must be logged in to make a submission.
   {% endif %}

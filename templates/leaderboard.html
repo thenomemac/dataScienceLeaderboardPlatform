@@ -2,6 +2,8 @@
 {% block title %}{{ title }}{% endblock %}
 {% block body %}
   <h2>Leaderboard</h2>
+  
+  <p>Contest Ends: {{ deadlineStr }}; Hours Remaining: {{ hoursLeft }}</p>
 
   <table class="table table-nonfluid">
     <thead class="thead-inverse">
@@ -16,7 +18,9 @@
     <tr>
       <th scope="row">{{ entry.rank }}</th>
       <td>{{ entry.username }}</td>
-      <td>{{ entry.score }}</td>
+      <td>{{ entry.public_score }}</td>
+      <td>{{ entry.private_score }}</td>
+      <td>{{ entry.sub_cnt }}</td>
     </tr>
     {% endfor %}
     </tbody>

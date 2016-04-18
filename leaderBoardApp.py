@@ -37,7 +37,14 @@ UPLOAD_FOLDER = 'contest/submissions/'
 ALLOWED_EXTENSIONS = ['csv', 'txt', 'zip', 'gz']
 # order the score function by asc or desc
 orderBy = 'asc'
-
+# set the max number of submissions a user is able to submit
+subNbr = 1
+# max number of submissions a user is allowed to make in a rolling 24hr period
+dailyLimit = 2
+# set the contest deadline where users can no longer upload and private score is published
+contestDeadline = time.mktime(datetime(2016, 10, 21, 0, 0).timetuple())
+# debug variable that allows private leaderboard to be displayed before contest deadline
+showPublic = False
 
 # create app
 app = Flask(__name__)
@@ -91,6 +98,12 @@ def format_datetime(timestamp):
     return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d @ %H:%M')
 
 
+def allowed_file(filename):
+    # checks if extension in filename is allowed
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+
 @app.before_request
 def before_request():
     g.usedPages = usedPages
@@ -115,30 +128,70 @@ def defaultlanding():
 
 @app.route('/leaderboard')
 def leaderboard():
-    #query the db and render the table used to display the leaderboard to users    
-    board = query_db('''
-        select username, public_score, private_score 
-        from submission sub
-        inner join (select user_id, max(submit_date) max_submit_date 
-          from submission group by user_id) max_sub
-        on sub.user_id = max_sub.user_id and
-          sub.submit_date = max_sub.max_submit_date 
-        inner join user
-        on sub.user_id = user.user_id
-        order by public_score %s''' % orderBy)
-    
+    #query the db and render the table used to display the leaderboard to users 
+    if (contestDeadline - time.time()) < 0 and showPublic:
+        board = query_db('''
+            select username, public_score, '?' private_score, sub_cnt
+            from submission sub
+            inner join (
+              select user_id, max(submit_date) max_submit_date, count(*) sub_cnt 
+              from submission 
+              group by user_id
+            ) max_sub
+            on sub.user_id = max_sub.user_id and
+              sub.submit_date = max_sub.max_submit_date 
+            inner join user
+            on sub.user_id = user.user_id
+            order by public_score %s''' % orderBy)
+    else:
+        #when evaluating for private score we take user selection table
+        #or most recent submission if user didn't specify what submission was final
+        board = query_db('''
+            select username, max(public_score) public_score, 
+                max(private_score) private_score, max(sub_cnt) sub_cnt
+            from (
+                select username, public_score, private_score, sub_cnt
+                from submission sub
+                left join (
+                  select user_id, max(submit_date) max_submit_date
+                  from submission 
+                  where user_id not in (select distinct user_id from selection)
+                  group by user_id
+                ) max_sub
+                on sub.user_id = max_sub.user_id
+                inner join (
+                  select user_id, count(*) sub_cnt 
+                  from submission 
+                  group by user_id
+                ) cnt
+                on sub.user_id = cnt.user_id
+                inner join user
+                on sub.user_id = user.user_id
+                left join selection 
+                on sub.submission_id = selection.submission_id
+                where
+                  case when select_date is not null then 1 else 
+                    case when max_submit_date is not null then 1 else 0 end
+                  end = 1
+            ) temp
+            group by username
+            order by private_score %s''' % orderBy)
+            
     #Debug: board = [{'public_score': 0.3276235370053617, 'username': 'test3', 'private_score': 0.32036252335937015}, {'public_score': 0.3276235370053617, 'username': 'test1', 'private_score': 0.32036252335937015}, {'public_score': 0.33944709256230005, 'username': 'test2', 'private_score': 0.32003513414185064}]
     board = [dict(row) for row in board]
     for rank, row in enumerate(board):
         row['rank'] = rank + 1
-        row['score'] = row['public_score']
     
-    colNames = ['Rank', 'Participant', 'Holdout Score']
+    colNames = ['Rank', 'Participant', 'Public Score', 'Private Score', 'Submission Count']
+    deadlineStr = str(datetime.fromtimestamp(contestDeadline))
+    hoursLeft = abs(round((contestDeadline - time.time()) / 3600, 2))
     
     return render_template('leaderboard.html',
                            title='Leaderboard',
                            colNames=colNames,
-                           leaderboard=board)
+                           leaderboard=board,
+                           deadlineStr=deadlineStr,
+                           hoursLeft=hoursLeft)
 
 
 @app.route('/description')
@@ -230,18 +283,71 @@ def discussion():
     return redirect(externalDiscussionLink)
 
 
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+@app.route('/selectmodel', methods=['POST'])
+def select_model():
+    """Allow user to select the upload they'd like to use for submission
+    Default selection should be most recent submissions
+    """
+    try:
+        input = request.form
+        print(str(input))
+        for count, x in enumerate(input): print(count, x)
+        if len(input) != subNbr:
+            flash("Error: Wrong number of submissions selected")
+        else:
+            db = get_db()
+            db.execute("delete from selection where user_id = '%s'" % session['user_id'])
+            db.commit()
+            #upload user defined selections to database
+            for count, submission_id in enumerate(input):
+                db = get_db()
+                db.execute('''insert into selection (user_id, select_nbr, submission_id,     
+                           select_date) values (?, ?, ?, ?)''',                  
+                           (session['user_id'], count + 1, int(submission_id), int(time.time())))
+                db.commit()
+                
+            flash("Selection successful!")
+    except:
+        flash("Error: Your selection was not recorded")
+    return redirect('/uploadsubmission')
 
 
 @app.route('/uploadsubmission', methods=['GET', 'POST'])
 def upload_file():
     """Allow users to upload submissions to modeling contest
     Users must be logged in."""
+    
+    #query the db and render the table used to display the leaderboard to users    
+    userBoard = query_db('''
+        select submission_id, submit_date, public_score
+        from submission sub
+        where user_id = '%s'
+        order by public_score %s''' % (session['user_id'], orderBy))
+    
+    userBoard = [dict(row) for row in userBoard]
+    for row in userBoard:
+        row['score'] = row['public_score']
+        row['str_time'] = str(datetime.fromtimestamp(row['submit_date']))
+        
+    colNames = ['Submission Time', 'Public Score']
+    
     if request.method == 'POST':
         try:
+            #ensure user hasn't exceeded daily submission limit
+            dailyCnt = query_db('''select count(*) sub_cnt
+                from submission sub
+                where submit_date > %s
+                group by user_id''' % (time.time() - 60*60*24))
+            dailyCnt = int(dict(dailyCnt[0])['sub_cnt'])
+            if dailyCnt > dailyLimit:
+                flash("Error: exceeded daily upload limit")
+                raise Exception('Upload limit exceeded')
+
             file = request.files['file']
+            #throw error if extension is not allowed
+            if not allowed_file(file.filename):
+                raise Exception('Invalid file extension')
+                
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 #append userid and date to file to avoid duplicates
@@ -250,6 +356,7 @@ def upload_file():
                 fullPath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(fullPath)
                 model_score = loadAndScore(fullPath)
+                
                 #cache the filename and submission to database
                 db = get_db()
                 db.execute('''insert into submission (user_id, filename, submit_date,     
@@ -257,12 +364,17 @@ def upload_file():
                            values (?, ?, ?, ?, ?, ?)''',                  
                            (session['user_id'], filename, int(time.time()), *model_score))
                 db.commit()
+                
+                #inform user upload was a success
                 flash('Your submission was recorded.')
                 return redirect(url_for('leaderboard'))
         except:
-            flash('File did not upload or score correctly!')
+            #if exception is thrown in process then flash user
+            flash('File did not upload or score! Make sure the submission format is correct.')
     return render_template('uploadsubmission.html', 
-                           title="Upload Submission")
+                           title="Upload Submission", 
+                           userBoard=userBoard,
+                           subNbr=subNbr)
 
 
 @app.route('/public')

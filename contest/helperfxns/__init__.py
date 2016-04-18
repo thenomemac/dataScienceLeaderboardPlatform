@@ -4,6 +4,8 @@ import pandas as pd
 def score(yhat, y):
     return float(np.mean((yhat - y)**2))
 
+#note that if an error is thrown in this fxn 
+#then the user will get a flash() that upload failed
 def loadAndScore(fullPath):
     """function loads the dataset from filePath and scores submission
     against the solution file
