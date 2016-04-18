@@ -23,7 +23,7 @@ Steps to running the app:
 4. Edit the function used to score and load user submitted data with the loss function for the contest in `contest/helperfxns/__init__.py`
 5. Place any files used in scoring in `contest/data` and any files the user needs to download in `contest/download`
 6. Run a `mkdir ./contest/submissions/` cmd to create the ignored folder where user uploads are cached. Or change global variable to save uploads to alternate path.
-7. By default `init_db()` at the bottom of the `leaderBoardApp.py` will only run if the database `./dsLeaderboard.db` does not exit
+7. By default `init_db()` at the bottom of the `leaderBoardApp.py` will only run if the database `./dsLeaderboard.db` does not exist
 8. To launch the app run with your default python distribution: `python leaderBoardApp.py`
 
 Note that the License is stated as MIT. This only pertains to app specific code. In the `static/` path copies of MathJax, jquery and bootstrap JS are included for making the app self contained. These dependencies have their own license agreements.
