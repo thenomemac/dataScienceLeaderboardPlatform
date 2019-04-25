@@ -11,7 +11,7 @@ create table submission (
   submission_id integer primary key autoincrement,
   user_id integer not null,
   filename text not null,
-  submit_date integer not null
+  submit_date integer not null,
   public_score real not null,
   private_score real not null,
   total_score real not null
