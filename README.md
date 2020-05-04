@@ -3,7 +3,7 @@ This flask app implements similar functionality to Kaggle.com. The app allows co
 
 Note that this app provides the functionality for users to create logins, then a user can upload a submission file. This submission file is scored agains a public and private leaderboard holdout dataset. This is the well know predictive modeling competion format established by Kaggle.com. Anyone can access the app without a login and view the public leaderboard. Only the contest admin can view the private leaderboard until the contest submission deadline has past. Then the score on the leaderboard is the joint public/private holdout score.
 
-The app also provides the functionaly to have serveral web pages for your predictive modeling contest:
+The app also provides the functionally to have several web pages for your predictive modeling contest:
 * Description
 * Evaluation
 * Rules
@@ -29,4 +29,3 @@ Steps to running the app:
 Note that the License is stated as MIT. This only pertains to app specific code. In the `static/` path copies of MathJax, jquery and bootstrap JS are included for making the app self contained. These dependencies have their own license agreements.
 
 Is the app tested? No unit tests still need to be written.
-App was buit on flask 0.1x
