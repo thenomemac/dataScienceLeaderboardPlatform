@@ -18,9 +18,8 @@ from datetime import datetime
 from flask import Flask, Markup, request, session, url_for, redirect, \
      render_template, abort, g, flash, send_from_directory, _app_ctx_stack
 from markdown import markdown
-from werkzeug import check_password_hash, generate_password_hash, \
-     secure_filename
-
+import werkzeug
+from werkzeug.security import check_password_hash, generate_password_hash
 
 # configuration
 DATABASE = 'dsLeaderboard.db'
@@ -373,7 +372,7 @@ def upload_file():
                 raise Exception('Invalid file extension')
                 
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
+                filename = werkzeug.secure_filename(file.filename)
                 #append userid and date to file to avoid duplicates
                 filename = str(session['user_id']) + '_' + \
                            str(int(time.time())) + '_' + filename
@@ -479,4 +478,6 @@ if __name__ == '__main__':
     #only re-run init_db() on initial launch if you want to truncate you're sql tables
     if not os.path.isfile('dsLeaderboard.db'):
         init_db()
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.mkdir(UPLOAD_FOLDER)
     app.run()
